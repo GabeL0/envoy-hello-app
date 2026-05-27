@@ -1,3 +1,6 @@
+require('dotenv').config();
+const { WebClient } = require('@slack/web-api');
+const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
 const express = require('express');
 const { envoyMiddleware, errorMiddleware } = require('@envoy/envoy-integrations-sdk');
 const app = express();
@@ -32,8 +35,18 @@ app.post('/visitor-sign-out', async (req, res) => {
   const envoy = req.envoy;
   const goodbye = envoy.meta.config.GOODBYE;
   const visitorName = envoy.payload.attributes['full-name'];
+  const hostEmail = envoy.payload.attributes['host-email'];
   const message = `${goodbye} ${visitorName}!`;
   await envoy.job.attach({ label: 'Goodbye', value: message });
+    
+  if (hostEmail) {
+    const user = await slack.users.lookupByEmail({ email: hostEmail });
+    await slack.chat.postMessage({
+      channel: user.user.id,
+      text: `Your visitor ${visitorName} has signed out.`,
+    });
+  } 
+    
   res.send({ goodbye });
 });
 
